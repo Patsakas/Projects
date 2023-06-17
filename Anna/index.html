@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Stick Figure Game</title>
+    <style>
+     body {
+        margin: 0;
+        padding: 0;
+      }
+
+      #game-container {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        background-color: skyblue;
+        background-image: url("dog.png");
+        background-repeat: no-repeat;
+        background-position: bottom;
+        background-size: auto 130px; /* Adjust the size according to your image */
+    
+  }
+      
+
+      #clouds {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 50%;
+        background-image: url("clouds.png");
+        background-repeat: repeat-x;
+        background-position: bottom;
+        opacity: 0.8;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      #sun {
+        position: absolute;
+        top: 50px;
+        right: 50px;
+        width: 200px;
+        height: 200px;
+        background-image: url("sun.png");
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: cover;
+        opacity: 0.8;
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      #ground {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        height: 20px;
+        background-color: green;
+      }
+
+      .stickman {
+        width: 50px;
+        height: 200px;
+        position: absolute;
+        bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      .stickman .head {
+        width: 50px;
+        height: 50px;
+        border: 2px solid black;
+        border-radius: 50%;
+        background-image: url("girlfriend-image.jpg");
+        background-size: cover;
+        background-position: center;
+      }
+
+      .stickman .body {
+  width: 30px;
+  height: 120px;
+  border-radius: 50% / 100% 100% 0% 0%;
+  background-color: black;
+  transition: height 0.3s ease-in-out; /* Add transition for smooth animation */
+}
+
+      .crouching .body {
+        height: 60px;
+      }
+
+      #start-message {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 24px;
+        color: white;
+      }
+
+      .falling-object {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  background-image: url("burger.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+
+      .enemy {
+        position: absolute;
+        width: 30px;
+        height: 30px;
+        background-color: red;
+        top: 200px;
+        bottom: 20px;
+        left: 0;
+        background-image: url("your-image2.jpg");
+        background-size: cover;
+        background-position: center;
+      }
+
+      #score {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 24px;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container">
+      <div id="clouds"></div>
+      <div id="sun"></div>
+      <div id="ground"></div>
+      <div class="stickman">
+        <div class="head"></div>
+        <div class="body"></div>
+      </div>
+       <audio id="background-music" src="background-music.mp3" autoplay loop></audio>
+      <div id="start-message">Press the up arrow to start</div>
+      <div id="score">Score: 0</div>
+      <div class="enemy"></div>
+    </div>
+
+    <script>
+      // Get references to the game container, player, and start message
+      const gameContainer = document.getElementById("game-container");
+      const ground = document.getElementById("ground");
+      const stickman = document.querySelector(".stickman");
+      const startMessage = document.getElementById("start-message");
+      const scoreElement = document.getElementById("score");
+      const musicState = localStorage.getItem("background-music");
+      const backgroundMusic = new Audio("background-music.mp3");
+      backgroundMusic.loop = true;
+       // Check the music state and play/pause accordingly
+       if (musicState === "playing") {
+        backgroundMusic.play();
+      } else {
+        backgroundMusic.pause();
+      }
+      
+      // Toggle the music state and play/pause when the user clicks the game container
+      gameContainer.addEventListener("click", () => {
+        if (backgroundMusic.paused) {
+          backgroundMusic.play();
+          localStorage.setItem("background-music", "playing");
+        } else {
+          backgroundMusic.pause();
+          localStorage.setItem("background-music", "paused");
+        }
+      });
+      // Set the initial stickman position
+      let stickmanX = (gameContainer.offsetWidth - stickman.offsetWidth) / 2;
+      let stickmanY =
+        gameContainer.offsetHeight - stickman.offsetHeight - ground.offsetHeight;
+      stickman.style.left = stickmanX + "px";
+
+      // Set the initial jump state
+      let isJumping = false;
+      let jumpSpeed = 15;
+      const gravity = 0.5;
+
+      // Set the initial crouch state
+      let isCrouching = false;
+
+      // Set the initial horizontal movement state
+      let isMovingLeft = false;
+      let isMovingRight = false;
+      const moveSpeed = 5;
+      let horizontalVelocity = 0;
+
+      // Set the initial score
+      let score = 0;
+
+      // Handle keyboard input
+      document.addEventListener("keydown", (event) => {
+        const key = event.key.toLowerCase();
+
+        if (key === "arrowleft") {
+          // Move left
+          isMovingLeft = true;
+        } else if (key === "arrowright") {
+          // Move right
+          isMovingRight = true;
+        } else if (key === "arrowup" && !isJumping) {
+          // Start the jump
+          isJumping = true;
+          jumpSpeed = 14;
+
+          // Hide the start message
+          startMessage.style.display = "none";
+        } else if (key === "arrowdown" && !isCrouching) {
+          // Crouch
+          isCrouching = true;
+          stickman.classList.add("crouching");
+        }
+      });
+
+      document.addEventListener("keyup", (event) => {
+        const key = event.key.toLowerCase();
+
+        if (key === "arrowleft") {
+          // Stop moving left
+          isMovingLeft = false;
+        } else if (key === "arrowright") {
+          // Stop moving right
+          isMovingRight = false;
+        } else if (key === "arrowdown" && isCrouching) {
+          // Stop crouching
+          isCrouching = false;
+          stickman.classList.remove("crouching");
+        }
+      });
+
+      // Create a falling object
+      function createFallingObject() {
+        const fallingObject = document.createElement("div");
+        fallingObject.className = "falling-object";
+        fallingObject.style.left =
+          Math.random() * (gameContainer.offsetWidth - 50) + "px";
+        fallingObject.style.top = -50 + "px";
+        const imageUrl =
+          Math.random() < 0.5 ? "burger.png" : "souvlaki.png";
+        fallingObject.style.backgroundImage = `url("${imageUrl}")`;
+        gameContainer.appendChild(fallingObject);
+
+        // Animate the falling object
+        function animateFallingObject() {
+          const topPosition = parseInt(fallingObject.style.top);
+          if (topPosition >= gameContainer.offsetHeight) {
+            // Remove the falling object when it reaches the ground
+            gameContainer.removeChild(fallingObject);
+          } else {
+            fallingObject.style.top = topPosition + 5 + "px";
+
+            // Check for collision with the stickman
+            if (collisionCheck(fallingObject, stickman)) {
+              // Increase the score
+              score++;
+              scoreElement.textContent = "Score: " + score;
+
+              // Remove the falling object
+              gameContainer.removeChild(fallingObject);
+            } else {
+              // Call the animation again on the next frame
+              requestAnimationFrame(animateFallingObject);
+            }
+          }
+        }
+
+        // Start the animation
+        animateFallingObject();
+      }
+
+      // Create an enemy moving across the screen
+      // Create an enemy moving across the screen
+function createMovingEnemy() {
+  const enemy = document.createElement("div");
+  enemy.className = "enemy";
+  enemy.style.left = gameContainer.offsetWidth + "px";
+  enemy.style.top =
+    Math.random() * (gameContainer.offsetHeight - 75 - 100) +
+    150 +
+    "px"; // Adjusted values for lower spawn and more frequent appearance
+  gameContainer.appendChild(enemy);
+
+  // Animate the enemy
+  function animateEnemy() {
+    const leftPosition = parseInt(enemy.style.left);
+    if (leftPosition < -50) {
+      // Remove the enemy when it goes off the screen
+      gameContainer.removeChild(enemy);
+    } else {
+      enemy.style.left = leftPosition - 5 + "px";
+
+      // Check for collision with the stickman
+      if (collisionCheck(enemy, stickman)) {
+        // Game over
+        endGame();
+      } else {
+        // Call the animation again on the next frame
+        requestAnimationFrame(animateEnemy);
+      }
+    }
+  }
+
+  // Start the animation
+  animateEnemy();
+}
+
+      // Check for collisions between the stickman and falling objects/enemies
+      function checkCollisions() {
+        const fallingObjects = document.getElementsByClassName(
+          "falling-object"
+        );
+        for (let i = 0; i < fallingObjects.length; i++) {
+          const fallingObject = fallingObjects[i];
+          if (collisionCheck(fallingObject, stickman)) {
+            // Increase the score
+            score++;
+            scoreElement.textContent = "Score: " + score;
+
+            // Remove the falling object
+            gameContainer.removeChild(fallingObject);
+          }
+        }
+      }
+
+      // Check if two elements are colliding
+      function collisionCheck(element1, element2) {
+        const rect1 = element1.getBoundingClientRect();
+        const rect2 = element2.getBoundingClientRect();
+        return !(
+          rect1.top > rect2.bottom ||
+          rect1.right < rect2.left ||
+          rect1.bottom < rect2.top ||
+          rect1.left > rect2.right
+        );
+      }
+
+      // End the game
+      // End the game
+function endGame() {
+  cancelAnimationFrame(animationFrameId);
+  
+  let endMessage = "You lose. ";
+
+  if (score === 32) {
+    endMessage += "Good shit you made it to my favorite number.";
+  } else if (score === 69) {
+    endMessage += "Nice 69.";
+  } else if (score === 11) {
+    endMessage += "Happy anniversary you have 11 points.";
+  } else if (score === 12) {
+    endMessage += "Happy birthday babe luv you. Score 12.";
+  } else if(score >=100) {
+    endMessage+= "O xristos aderfe moy poso variesai.De peirazei gia sagapw" +score+ "fores Anna moy";
+  } 
+  else {
+    endMessage += "But I love you " + score + " times my Alounna.";
+  }
+
+  gameContainer.innerHTML = endMessage;
+}
+
+
+      // Game loop to apply gravity and update stickman's position
+      function gameLoop() {
+        if (isJumping) {
+          // Apply jump force
+          stickmanY += jumpSpeed;
+          jumpSpeed -= gravity;
+
+          // Check if the stickman has landed on the ground
+          if (stickmanY <= ground.offsetHeight) {
+            stickmanY = ground.offsetHeight;
+            jumpSpeed = 0;
+            isJumping = false;
+          }
+        }
+
+        // Apply horizontal movement
+        if (isMovingLeft) {
+          horizontalVelocity = -moveSpeed;
+        } else if (isMovingRight) {
+          horizontalVelocity = moveSpeed;
+        } else {
+          horizontalVelocity = 0;
+        }
+        stickmanX += horizontalVelocity;
+
+        // Update the stickman's position in the DOM
+        stickman.style.left = stickmanX + "px";
+        stickman.style.bottom = stickmanY + "px";
+
+        // Adjust the hitbox based on crouch state
+        if (isCrouching) {
+          stickman.style.height = "150px";
+        } else {
+          stickman.style.height = "200px";
+        }
+
+        // Check for collisions
+        checkCollisions();
+
+        // Call the game loop again on the next frame
+        animationFrameId = requestAnimationFrame(gameLoop);
+      }
+
+      // Show the start message initially
+      startMessage.style.display = "block";
+
+      // Start the game loop
+      let animationFrameId = requestAnimationFrame(gameLoop);
+
+      // Start creating falling objects and enemies
+      setInterval(createFallingObject, 1500);
+      setInterval(createMovingEnemy, 1300);
+    </script>
+  </body>
+</html>

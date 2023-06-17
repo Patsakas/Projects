@@ -1,0 +1,8 @@
+#player {
+    width: 200px;
+    height: 200px;
+    position: absolute;
+    left: calc(50% - 100px);
+    bottom: 20px;
+  }
+  
